@@ -1,0 +1,70 @@
+#!/bin/bash
+
+usage="Usage: dload [-i image folder] [-s service project path] <project name> [up]"
+imgDir="/srv/files/docker-images"
+svcDir=""
+
+while getopts "i:s:h" opt; do
+	case $opt in
+		i) imgDir="$OPTARG" ;;
+		s) svcDir="$OPTARG" ;;
+		*) echo "$usage" >&2; exit 1;;
+	esac
+done
+shift $((OPTIND - 1))
+
+# Project Name
+pname="${1:?$usage}"
+action="${2:-test}"
+svcDir="${svcDir:-$HOME/services/$pname}"
+
+# Check if Folder and files exists
+[[ -d "$imgDir" ]] || { echo "Error: image folder not found: $imgDir" >&2; exit 1; }
+[[ -d "$svcDir" ]] || { echo "Error: service folder not found: $svcDir" >&2; exit 1; }
+# loops through all possible docker compose file names and checck if svcDir has the file.
+# if it has, it breaks out of the loop and add the file name to composeFile
+composeFile=""
+for name in compose.yaml compose.yml docker-compose.yaml docker-compose.yml; do
+	if [[ -f "$svcDir/$name" ]]; then
+		composeFile="$svcDir/$name";
+		break
+	fi
+done
+if [[ -z "$composeFile" ]] then
+	echo "Error: no docker compose file found in $svcDir" >&2
+	exit 1
+fi
+[[ "$action" == "test" ]] && echo "Using $composeFile"
+
+# Check Image Directiory if the project name exist as tar.gz file
+shopt -s nullglob
+files=( "$imgDir/$pname".*.tar.gz )
+(( ${#files[@]} )) || { echo "Error: no $pname.*.tar.gz in $imgDir" >&2; exit 1; }
+
+# so when run any commands that make changes to disk, it will check if
+# the action is run or test, if the action is run, it will process the command
+# else it will echo a test message with the faked results.
+run() {
+	if [[ "$action" == "up" ]]; then
+		"$@"
+	else
+		echo "[test] $*"
+	fi
+}
+
+# We only allow if action is up or test, anything else, it returns an error
+case "$action" in
+	test|up) ;;
+	*) echo "Unknown action: $action" >&2; echo "$usage" >&2; exit 1;;
+esac
+
+# Load the image into docker
+for f in "${files[@]}"; do
+	run docker load -i "$f"
+done
+
+# use the image to update existing docker container
+run docker compose --project-directory "$svcDir" up -d
+
+run docker image prune -f
+
