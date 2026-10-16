@@ -13,3 +13,7 @@ if(-not (Test-Path $dir)) {
 } else {
 	"$dir already exist."
 }
+
+# Copy all command files to bin folder
+Copy-Item -Path *.cmd -Destination $dir
+Copy-Item -Path *.ps1 -Destination $dir

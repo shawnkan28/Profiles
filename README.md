@@ -19,3 +19,6 @@ hello shawn -Loud
 // return HELLO, SHAWN!
 
 ```
+
+## docker-tar.cmd
+used to generate docker images in tar format. user need to provide the platform to generate the tar. By default, the file will be dumped in RPI path if exist. else fail or user can provide path instead. This has to be ran within the project folder. So meaning the DockerFile should be in the same path
